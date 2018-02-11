@@ -22,6 +22,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.animation.TranslateAnimation;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -42,17 +43,25 @@ import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MapStyleOptions;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.GoogleMap.OnMarkerClickListener;
 import com.google.android.gms.maps.model.VisibleRegion;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import net.minidev.json.JSONArray;
 
+import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
-public class MapsActivity extends FragmentActivity implements OnMyLocationButtonClickListener, OnMyLocationClickListener, LocationListener, OnMapReadyCallback, OnCameraIdleListener, OnCameraMoveStartedListener {
+public class MapsActivity extends FragmentActivity implements OnMyLocationButtonClickListener, OnMyLocationClickListener, LocationListener, OnMapReadyCallback, OnCameraIdleListener,
+        OnCameraMoveStartedListener, PostMessageDialogFragment.PostMessageDialogListener, OnMarkerClickListener {
     public static final String PREFS_NAME = "com.lee.etirps.fragments.PREFS";
+
+    public List<Marker> markers = new ArrayList<>();
+    public Marker selected_mark;
 
     private GoogleMap mMap;
     private FusedLocationProviderClient myLocation;
@@ -64,10 +73,15 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
     private LatLng topRight;
     private LatLng bottomLeft;
 
+    private LatLng mostTopRight;
+    private LatLng mostBottomLeft;
+
     private Location currentLocation;
     private View taskBar;
 
     private getDataReceiver receiver;
+    private sendDataReceiver sendreceiver;
+    private getMarkerReceiver markerReceiver;
     //private LatLngBounds CenterBound;
     //private LocationManager locationManager;
     //private static final long MIN_TIME = 200;
@@ -82,11 +96,16 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
 
         IntentFilter filter = new IntentFilter(getDataReceiver.MESSAGE);
-
         receiver = new getDataReceiver();
-
         registerReceiver(receiver, filter);
 
+        IntentFilter send_filter = new IntentFilter(sendDataReceiver.MESSAGE);
+        sendreceiver = new sendDataReceiver();
+        registerReceiver(sendreceiver, send_filter);
+
+        IntentFilter marker_filter = new IntentFilter(getMarkerReceiver.MESSAGE);
+        markerReceiver = new getMarkerReceiver();
+        registerReceiver(markerReceiver, marker_filter);
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
@@ -107,6 +126,8 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
     @Override
     public void onDestroy(){
         this.unregisterReceiver(receiver);
+        this.unregisterReceiver(sendreceiver);
+        this.unregisterReceiver(markerReceiver);
         super.onDestroy();
     }
 
@@ -128,7 +149,8 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         mMap.setOnMyLocationClickListener(this);
         mMap.setOnCameraIdleListener(this);
         mMap.setOnCameraMoveStartedListener(this);
-        mMap.addMarker(new MarkerOptions().position(new LatLng(42.109015, -75.946749)).title("My Home"));
+        mMap.setOnMarkerClickListener(this);
+        //mMap.addMarker(new MarkerOptions().position(new LatLng(42.109015, -75.946749)).title("My Home"));
 
         //boolean styled = mMap.setMapStyle(new MapStyleOptions(getResources().getString(R.string.lite_json)));
 
@@ -138,7 +160,7 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
 
         mUiSettings = mMap.getUiSettings();
         mUiSettings.setMapToolbarEnabled(false);
-        mUiSettings.setZoomGesturesEnabled(false);
+        mUiSettings.setZoomGesturesEnabled(true);
         mUiSettings.setZoomControlsEnabled(false);
         mUiSettings.setRotateGesturesEnabled(false);
         mUiSettings.setTiltGesturesEnabled(false);
@@ -179,6 +201,46 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         //Log.v("height", "test " + (viewPort.farLeft.latitude - viewPort.nearRight.latitude));
 
         //mMap.addMarker(new MarkerOptions().position(new LatLng(location.getLatitude(), location.getLongitude())));
+    }
+
+    @Override
+    public boolean onMarkerClick(Marker marker){
+        LatLng latLng = marker.getPosition();
+        //Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
+        CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 18);
+        mMap.animateCamera(cameraUpdate);
+
+        Log.v("onMarkerClick", "Clicked");
+
+        selected_mark = marker;
+
+        Intent fetchData = new Intent(MapsActivity.this, getMarkerData.class);
+        fetchData.putExtra(getMarkerData.MARKER, latLng.latitude + ":" + latLng.longitude);
+        fetchData.putExtra(getMarkerData.LOCATION, currentLocation.getLatitude() + ":" + currentLocation.getLongitude());
+        startService(fetchData);
+
+        return false;
+    }
+
+    @Override
+    public void onDialogPositiveClick(DialogFragment dialog){
+        String name = ((EditText)dialog.getDialog().findViewById(R.id.name)).getText().toString();
+        String msg = ((EditText)dialog.getDialog().findViewById(R.id.message_box)).getText().toString();
+        String lat = String.valueOf(currentLocation.getLatitude());
+        String lng = String.valueOf(currentLocation.getLongitude());
+        String date = Calendar.getInstance().get(Calendar.YEAR) + "-" + Calendar.getInstance().get(Calendar.MONTH)+1 + "-" + Calendar.getInstance().get(Calendar.DAY_OF_MONTH);
+
+
+        Intent newPoint = new Intent(MapsActivity.this, sendData.class);
+
+        newPoint.putExtra(sendData.ALL, lat + "|||" + lng + "|||" + date + "|||" + name + "|||" + msg);
+
+        startService(newPoint);
+    }
+
+    @Override
+    public void onDialogNegativeClick(DialogFragment dialog){
+        dialog.dismiss();
     }
 
     @Override
@@ -233,10 +295,14 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
     public void scanButtonPress(View view){
         moveCameraToLocation(currentLocation);
 
+        for(Marker m : markers){
+            m.remove();
+        }
+
         Intent getPoints = new Intent(MapsActivity.this, getData.class);
 
-        getPoints.putExtra(getData.TOP_RIGHT, topRight.latitude + ":" + topRight.longitude);
-        getPoints.putExtra(getData.BOTTOM_LET, bottomLeft.latitude + ":" + bottomLeft.longitude);
+        getPoints.putExtra(getData.TOP_RIGHT, mostTopRight.latitude + ":" + mostTopRight.longitude);
+        getPoints.putExtra(getData.BOTTOM_LET, mostBottomLeft.latitude + ":" + mostBottomLeft.longitude);
 
         startService(getPoints);
     }
@@ -256,6 +322,12 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         bottomLeft = one;
         topRight = two;
 
+        mostTopRight = new LatLng(topRight.latitude + (viewHeight/2), topRight.longitude + (viewHeight/2));
+        mostBottomLeft = new LatLng(bottomLeft.latitude - (viewHeight/2), bottomLeft.longitude - (viewWidth/2));
+
+        //mMap.addMarker(new MarkerOptions().position(mostTopRight));
+        //mMap.addMarker(new MarkerOptions().position(mostBottomLeft));
+
         mMap.setLatLngBoundsForCameraTarget(box);
 
     }
@@ -273,26 +345,55 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         }
     }
 
-    public static class PostMessageDialogFragment extends DialogFragment{
+
+    public class sendDataReceiver extends BroadcastReceiver{
+        public static final String MESSAGE = "BRO THE DATA IS SENT!";
+
         @Override
-        public Dialog onCreateDialog(Bundle savedInstanceState) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        public void onReceive(Context context, Intent intent) {
+            String responseMessage = getSharedPreferences(PREFS_NAME,0).getString(sendData.RESPONSE_MESSAGE,"No Message");
+            Toast.makeText(MapsActivity.this, responseMessage, Toast.LENGTH_LONG).show();
+        }
+    }
 
-            LayoutInflater inflater = getActivity().getLayoutInflater();
+    public class getMarkerReceiver extends BroadcastReceiver{
+        public static final String MESSAGE = "BRO THE MARKER DATA IS DOWNLOADED!!!!!";
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String responseMessage = getSharedPreferences(PREFS_NAME,0).getString(getMarkerData.RESPONSE_MESSAGE, "No Message");
 
-            builder.setView(inflater.inflate(R.layout.dialog_create, null)).setPositiveButton("Post", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i) {
-                    PostMessageDialogFragment.this.getDialog().cancel();
-                }
-            })      .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialogInterface, int i) {
-                            PostMessageDialogFragment.this.getDialog().cancel();
-                        }
-                    }).setTitle("Drop a Fragment");
+            Toast.makeText(MapsActivity.this, responseMessage, Toast.LENGTH_SHORT).show();
 
-            return builder.create();
+            //JSONArray var = JsonPath.read(responseMessage, "$");
+
+            //selected_mark.setTitle(String.valueOf(var.get(0)));
+            //selected_mark.setSnippet(String.valueOf(var.get(1)));
+
+            /*
+            JSONArray var = JsonPath.read(responseMessage, "$");
+
+            for(Object obj : var){
+
+                float lat = Float.valueOf(String.valueOf(((JSONArray) obj).get(1)));
+                float lng = Float.valueOf(String.valueOf(((JSONArray) obj).get(2)));
+
+                //String author = String.valueOf(((JSONArray) obj).get(3));
+                //String msg = String.valueOf(((JSONArray) obj).get(4));
+
+                LatLng coord = new LatLng(lat, lng);
+                markers.add(mMap.addMarker(new MarkerOptions().position(coord).title("Undiscovered Fragment")));
+            }*/
+
+            /*
+            try{
+                Log.e("MapActivity" , String.valueOf(((JSONArray) var.get(0)).get(0)));
+            }catch (Exception ex)
+            {
+                //
+            }*/
+
+            //Toast.makeText(MapsActivity.this, responseMessage, Toast.LENGTH_SHORT).show();
+
         }
     }
 
@@ -306,24 +407,25 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
 
             for(Object obj : var){
 
-                float lat = Float.valueOf(String.valueOf(((JSONArray) obj).get(1)));
-                float lng = Float.valueOf(String.valueOf(((JSONArray) obj).get(2)));
+                float lat = Float.valueOf(String.valueOf(((JSONArray) obj).get(0)));
+                float lng = Float.valueOf(String.valueOf(((JSONArray) obj).get(1)));
 
-                String author = String.valueOf(((JSONArray) obj).get(3));
-                String msg = String.valueOf(((JSONArray) obj).get(4));
+                //String author = String.valueOf(((JSONArray) obj).get(3));
+                //String msg = String.valueOf(((JSONArray) obj).get(4));
 
                 LatLng coord = new LatLng(lat, lng);
-                mMap.addMarker(new MarkerOptions().position(coord).title(author).snippet(msg));
+                markers.add(mMap.addMarker(new MarkerOptions().position(coord).title("Undiscovered Fragment")));
             }
 
+            /*
             try{
                 Log.e("MapActivity" , String.valueOf(((JSONArray) var.get(0)).get(0)));
             }catch (Exception ex)
             {
                 //
-            }
+            }*/
 
-            Toast.makeText(MapsActivity.this, responseMessage, Toast.LENGTH_SHORT).show();
+            //Toast.makeText(MapsActivity.this, responseMessage, Toast.LENGTH_SHORT).show();
 
         }
     }

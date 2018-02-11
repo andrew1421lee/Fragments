@@ -15,30 +15,30 @@ import java.net.URL;
  * Created by Anchu on 2/10/2018.
  */
 
-public class getData extends IntentService{
+public class getMarkerData extends IntentService{
 
-    public static final String TOP_RIGHT = "fragments.getdata.get.TOP_RIGHT_BOUND";
-    public static final String BOTTOM_LET = "fragments.getdata.get.BOTTOM_LET_BOUND";
+    public static final String LOCATION = "fragments.getmarker.get.LOCATION";
+    public static final String MARKER = "fragments.getmarker.get.MARKER";
 
-    public static final String RESPONSE_MESSAGE = "fragments.getdata.get.RESPONSE_MESSAGE";
+    public static final String RESPONSE_MESSAGE = "fragments.getmarker.get.RESPONSE_MESSAGE";
 
-    public getData(){
-        super("getData"); // run IntentService constructor with name e621GetService
+    public getMarkerData(){
+        super("getMarkerData"); // run IntentService constructor with name e621GetService
     }
 
     @Override
     protected void onHandleIntent(Intent intent) {
-        String topRight = intent.getStringExtra(getData.TOP_RIGHT);
-        String bottomLeft = intent.getStringExtra(getData.BOTTOM_LET);
+        String location = intent.getStringExtra(getMarkerData.LOCATION);
+        String marker = intent.getStringExtra(getMarkerData.MARKER);
 
-        Log.d("getData", topRight);
-        Log.d("getData", bottomLeft);
+        Log.d("getMarkerData", location);
+        Log.d("getMarkerData", marker);
 
         HttpURLConnection connection;
         URL url;
         String responseString = "";
         try{
-            url = new URL("http://149.125.137.126:5000/get_points/" + topRight + "=" + bottomLeft);
+            url = new URL("http://149.125.137.126:5000/get_marker/" + location + "=" + marker);
             try{
                 connection = (HttpURLConnection) url.openConnection();
 
@@ -54,24 +54,23 @@ public class getData extends IntentService{
                         result.write(buffer, 0, length);
                     }
                     responseString = result.toString("UTF-8");
-                    //Log.e("getData", "err " + connection.getResponseCode());
-                    //Log.e("getDAta", responseString);
+                    Log.e("getMarkerData", "err " + connection.getResponseCode());
                 }catch (Exception ex) {
-                    Log.e("getData", "err " + connection.getResponseCode());
+                    Log.e("getMarkerData", "err " + connection.getResponseCode());
                 }finally {
                     connection.disconnect();
                 }
             } catch (Exception ex) {
-                Log.e("getData", ex.getMessage());
+                Log.e("getMarkerData", ex.getMessage());
             }
 
         }catch(Exception ex){
-            Log.e("getData", ex.getMessage());
+            Log.e("getMarkerData", ex.getMessage());
         }
 
-        Intent broadcastIntent = new Intent(MapsActivity.getDataReceiver.MESSAGE);
+        Intent broadcastIntent = new Intent(MapsActivity.getMarkerReceiver.MESSAGE);
         SharedPreferences.Editor editor = getSharedPreferences(MapsActivity.PREFS_NAME,0).edit();
-        editor.putString(getData.RESPONSE_MESSAGE, responseString);
+        editor.putString(getMarkerData.RESPONSE_MESSAGE, responseString);
         editor.commit();
         sendBroadcast(broadcastIntent);
     }

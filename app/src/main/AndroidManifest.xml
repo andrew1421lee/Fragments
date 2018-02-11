@@ -39,6 +39,10 @@
         </activity>
         <service android:name=".getData"
             android:exported="true"/>
+        <service android:name=".sendData"
+            android:exported="true"/>
+        <service android:name=".getMarkerData"
+            android:exported="true"/>
     </application>
 
 </manifest>
