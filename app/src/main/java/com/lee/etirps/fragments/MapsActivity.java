@@ -23,6 +23,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.animation.TranslateAnimation;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -51,6 +52,8 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import net.minidev.json.JSONArray;
+
+import org.w3c.dom.Text;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -150,6 +153,43 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         mMap.setOnCameraIdleListener(this);
         mMap.setOnCameraMoveStartedListener(this);
         mMap.setOnMarkerClickListener(this);
+
+        mMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
+
+            @Override
+            public View getInfoWindow(Marker marker) {
+                // Getting view from the layout file
+                View v = getLayoutInflater().inflate(R.layout.custom_infowindow, null);
+
+                TextView title = (TextView) v.findViewById(R.id.author);
+                title.setText(marker.getTitle());
+
+                TextView message = (TextView) v.findViewById(R.id.message_text);
+                TextView date = (TextView) v.findViewById(R.id.msg_Date);
+                //Log.v("getInfoWindow", marker.getSnippet() + ".");
+                try{
+                    String[] splitted = marker.getSnippet().split("#!#");
+                    //Log.v("getInfoWindow", splitted[1]);
+                    //Log.v("getInfoWindow", splitted[0]);
+
+                    message.setText(splitted[1]);
+                    date.setText(splitted[0]);
+                }catch(NullPointerException ex){
+                    message.setText("");
+                    date.setText("");
+                }
+
+
+                return v;
+            }
+
+            @Override
+            public View getInfoContents(Marker arg0) {
+                return null;
+
+            }
+        });
+
         //mMap.addMarker(new MarkerOptions().position(new LatLng(42.109015, -75.946749)).title("My Home"));
 
         //boolean styled = mMap.setMapStyle(new MapStyleOptions(getResources().getString(R.string.lite_json)));
@@ -362,7 +402,14 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         public void onReceive(Context context, Intent intent) {
             String responseMessage = getSharedPreferences(PREFS_NAME,0).getString(getMarkerData.RESPONSE_MESSAGE, "No Message");
 
-            Toast.makeText(MapsActivity.this, responseMessage, Toast.LENGTH_SHORT).show();
+            JSONArray obj = JsonPath.read(responseMessage, "$");
+
+            selected_mark.setTitle(String.valueOf(obj.get(1)));
+            selected_mark.setSnippet(String.valueOf(obj.get(0)) + "#!#" + String.valueOf(obj.get(2)));
+            Log.v("getMarkerReceiver", selected_mark.getSnippet());
+            selected_mark.showInfoWindow();
+
+            //Toast.makeText(MapsActivity.this, responseMessage, Toast.LENGTH_SHORT).show();
 
             //JSONArray var = JsonPath.read(responseMessage, "$");
 

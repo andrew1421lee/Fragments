@@ -54,7 +54,7 @@ public class getMarkerData extends IntentService{
                         result.write(buffer, 0, length);
                     }
                     responseString = result.toString("UTF-8");
-                    Log.e("getMarkerData", "err " + connection.getResponseCode());
+                    //Log.e("getMarkerData", "err " + connection.getResponseCode());
                 }catch (Exception ex) {
                     Log.e("getMarkerData", "err " + connection.getResponseCode());
                 }finally {
