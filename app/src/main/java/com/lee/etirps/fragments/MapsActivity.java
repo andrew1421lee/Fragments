@@ -1,7 +1,6 @@
 package com.lee.etirps.fragments;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
@@ -11,6 +10,8 @@ import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.view.View;
+import android.view.animation.TranslateAnimation;
 import android.widget.Toast;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -24,6 +25,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMap.OnMyLocationButtonClickListener;
 import com.google.android.gms.maps.GoogleMap.OnMyLocationClickListener;
 import com.google.android.gms.maps.GoogleMap.OnCameraIdleListener;
+import com.google.android.gms.maps.GoogleMap.OnCameraMoveStartedListener;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.UiSettings;
@@ -34,7 +36,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.VisibleRegion;
 import com.google.android.gms.tasks.OnSuccessListener;
 
-public class MapsActivity extends FragmentActivity implements OnMyLocationButtonClickListener, OnMyLocationClickListener, LocationListener, OnMapReadyCallback, OnCameraIdleListener {
+public class MapsActivity extends FragmentActivity implements OnMyLocationButtonClickListener, OnMyLocationClickListener, LocationListener, OnMapReadyCallback, OnCameraIdleListener, OnCameraMoveStartedListener {
 
     private GoogleMap mMap;
     private FusedLocationProviderClient myLocation;
@@ -42,6 +44,8 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
     private UiSettings mUiSettings;
     private double viewWidth = 0.002452544867992401;
     private double viewHeight = 0.002948395655657521;
+    private Location currentLocation;
+    private View taskBar;
     //private LatLngBounds CenterBound;
     //private LocationManager locationManager;
     //private static final long MIN_TIME = 200;
@@ -61,17 +65,17 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         mLocationCallback = new LocationCallback(){
             @Override
             public void onLocationResult(LocationResult result){
-                Location last = result.getLastLocation();
-                LatLng latLng = new LatLng(last.getLatitude(), last.getLongitude());
-                CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 18);
-                mMap.animateCamera(cameraUpdate);
+                currentLocation = result.getLastLocation();
+                moveCameraToLocation(currentLocation);
 
+                LatLng latLng = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
                 LatLng one = new LatLng(latLng.latitude - (viewHeight/2), latLng.longitude - (viewWidth /2));
                 LatLng two = new LatLng(latLng.latitude + (viewHeight/2),latLng.longitude + (viewWidth/2));
                 LatLngBounds box = new LatLngBounds(one, two);
                 mMap.setLatLngBoundsForCameraTarget(box);
             }
         };
+        taskBar = findViewById(R.id.taskbar);
     }
 
     /**
@@ -91,6 +95,7 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         mMap.setOnMyLocationButtonClickListener(this);
         mMap.setOnMyLocationClickListener(this);
         mMap.setOnCameraIdleListener(this);
+        mMap.setOnCameraMoveStartedListener(this);
         mMap.addMarker(new MarkerOptions().position(new LatLng(42.109015, -75.946749)).title("My Home"));
 
         //boolean styled = mMap.setMapStyle(new MapStyleOptions(getResources().getString(R.string.lite_json)));
@@ -105,6 +110,7 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         mUiSettings.setZoomControlsEnabled(false);
         mUiSettings.setRotateGesturesEnabled(false);
         mUiSettings.setTiltGesturesEnabled(false);
+        mUiSettings.setMyLocationButtonEnabled(false);
         mMap.setBuildingsEnabled(false);
 
         mUiSettings.setScrollGesturesEnabled(true);
@@ -113,15 +119,15 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
             myLocation.getLastLocation().addOnSuccessListener(this, new OnSuccessListener<Location>() {
                 @Override
                 public void onSuccess(Location location) {
-                    LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-                    CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 18);
-                    mMap.animateCamera(cameraUpdate);
+                    moveCameraToLocation(location);
+
+                    LatLng latLng = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
 
                     LatLng one = new LatLng(latLng.latitude - (viewHeight/2), latLng.longitude - (viewWidth /2));
                     LatLng two = new LatLng(latLng.latitude + (viewHeight/2),latLng.longitude + (viewWidth/2));
+
                     LatLngBounds box = new LatLngBounds(one, two);
                     mMap.setLatLngBoundsForCameraTarget(box);
-
                 }
             });
             myLocation.requestLocationUpdates(new LocationRequest().setInterval(200).setSmallestDisplacement(5),mLocationCallback,null);
@@ -136,7 +142,6 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
     public void onMyLocationClick(@NonNull Location location) {
         Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
 
-
         VisibleRegion viewPort = mMap.getProjection().getVisibleRegion();
         mMap.addMarker(new MarkerOptions().position(viewPort.farLeft));
         mMap.addMarker(new MarkerOptions().position(viewPort.farRight));
@@ -149,10 +154,7 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
 
     @Override
     public void onLocationChanged(Location location) {
-        LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-        //Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
-        CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 18);
-        mMap.animateCamera(cameraUpdate);
+        moveCameraToLocation(location);
 
         /*
         VisibleRegion viewPort = mMap.getProjection().getVisibleRegion();
@@ -175,9 +177,40 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
 
     @Override
     public void onCameraIdle(){
-        Toast.makeText(this, "IDLE", Toast.LENGTH_SHORT).show();
+        taskBar.setVisibility(View.VISIBLE);
+        TranslateAnimation animate = new TranslateAnimation(
+                0,                 // fromXDelta
+                0,                 // toXDelta
+                taskBar.getHeight(),  // fromYDelta
+                0);                // toYDelta
+        animate.setDuration(500);
+        animate.setFillAfter(true);
+        taskBar.startAnimation(animate);
+    }
 
+    @Override
+    public void onCameraMoveStarted(int i){
+        TranslateAnimation animate = new TranslateAnimation(
+                0,                 // fromXDelta
+                0,                 // toXDelta
+                0,                 // fromYDelta
+                taskBar.getHeight()); // toYDelta
+        animate.setDuration(200);
+        animate.setFillAfter(true);
+        taskBar.startAnimation(animate);
+        taskBar.setVisibility(View.INVISIBLE);
+    }
 
+    public void scanButtonPress(View view){
+        moveCameraToLocation(currentLocation);
+    }
+
+    public void moveCameraToLocation(Location location){
+        currentLocation = location;
+        LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+        //Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
+        CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 18);
+        mMap.animateCamera(cameraUpdate);
     }
 
     private void enableMyLocation() {

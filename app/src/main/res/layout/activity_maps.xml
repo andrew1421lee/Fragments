@@ -6,4 +6,24 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     map:cameraZoom="18"
-    tools:context="com.lee.etirps.fragments.MapsActivity" />
+    tools:context="com.lee.etirps.fragments.MapsActivity">
+
+    <LinearLayout
+        android:id="@+id/taskbar"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:layout_gravity="center|bottom"
+        android:orientation="horizontal"
+        >
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="Scan Area"
+            android:padding="10dp"
+            android:layout_marginLeft="120dp"
+            android:layout_marginRight="120dp"
+            android:onClick="scanButtonPress"
+            />
+    </LinearLayout>
+</fragment>
