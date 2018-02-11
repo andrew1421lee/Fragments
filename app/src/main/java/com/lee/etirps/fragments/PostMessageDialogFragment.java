@@ -42,7 +42,7 @@ public class PostMessageDialogFragment extends DialogFragment {
 
         LayoutInflater inflater = getActivity().getLayoutInflater();
 
-        builder.setView(inflater.inflate(R.layout.dialog_create, null)).setPositiveButton("Post", new DialogInterface.OnClickListener() {
+        builder.setView(inflater.inflate(R.layout.dialog_create, null)).setPositiveButton("Drop", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialogInterface, int i) {
                 mListener.onDialogPositiveClick(PostMessageDialogFragment.this);

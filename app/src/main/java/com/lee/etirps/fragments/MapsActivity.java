@@ -41,6 +41,7 @@ import com.google.android.gms.maps.GoogleMap.OnCameraMoveStartedListener;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.UiSettings;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MapStyleOptions;
@@ -200,7 +201,7 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
 
         mUiSettings = mMap.getUiSettings();
         mUiSettings.setMapToolbarEnabled(false);
-        mUiSettings.setZoomGesturesEnabled(true);
+        mUiSettings.setZoomGesturesEnabled(false);
         mUiSettings.setZoomControlsEnabled(false);
         mUiSettings.setRotateGesturesEnabled(false);
         mUiSettings.setTiltGesturesEnabled(false);
@@ -245,6 +246,7 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
 
     @Override
     public boolean onMarkerClick(Marker marker){
+        //marker.setAlpha(1.0f);
         LatLng latLng = marker.getPosition();
         //Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
         CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 18);
@@ -268,8 +270,9 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         String msg = ((EditText)dialog.getDialog().findViewById(R.id.message_box)).getText().toString();
         String lat = String.valueOf(currentLocation.getLatitude());
         String lng = String.valueOf(currentLocation.getLongitude());
-        String date = Calendar.getInstance().get(Calendar.YEAR) + "-" + Calendar.getInstance().get(Calendar.MONTH)+1 + "-" + Calendar.getInstance().get(Calendar.DAY_OF_MONTH);
+        String date = Calendar.getInstance().get(Calendar.YEAR) + "-" + Integer.valueOf(Calendar.getInstance().get(Calendar.MONTH) + 1) + "-" + Calendar.getInstance().get(Calendar.DAY_OF_MONTH);
 
+        Log.v("date", date);
 
         Intent newPoint = new Intent(MapsActivity.this, sendData.class);
 
@@ -402,12 +405,18 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         public void onReceive(Context context, Intent intent) {
             String responseMessage = getSharedPreferences(PREFS_NAME,0).getString(getMarkerData.RESPONSE_MESSAGE, "No Message");
 
-            JSONArray obj = JsonPath.read(responseMessage, "$");
+            try{
+                JSONArray obj = JsonPath.read(responseMessage, "$");
 
-            selected_mark.setTitle(String.valueOf(obj.get(1)));
-            selected_mark.setSnippet(String.valueOf(obj.get(0)) + "#!#" + String.valueOf(obj.get(2)));
-            Log.v("getMarkerReceiver", selected_mark.getSnippet());
-            selected_mark.showInfoWindow();
+                selected_mark.setTitle(String.valueOf(obj.get(1)));
+                selected_mark.setSnippet(String.valueOf(obj.get(0)) + "#!#" + String.valueOf(obj.get(2)));
+                Log.v("getMarkerReceiver", selected_mark.getSnippet());
+                selected_mark.showInfoWindow();
+            }catch(Exception ex){
+                selected_mark.setTitle("Undiscovered Fragment");
+                selected_mark.setSnippet("Move closer to view" + "#!#" + "...");
+            }
+
 
             //Toast.makeText(MapsActivity.this, responseMessage, Toast.LENGTH_SHORT).show();
 
@@ -461,7 +470,11 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
                 //String msg = String.valueOf(((JSONArray) obj).get(4));
 
                 LatLng coord = new LatLng(lat, lng);
-                markers.add(mMap.addMarker(new MarkerOptions().position(coord).title("Undiscovered Fragment")));
+                markers.add(mMap.addMarker(new MarkerOptions()
+                        .position(coord)
+                        .title("Undiscovered Fragment")
+                        .icon(BitmapDescriptorFactory.fromResource(R.mipmap.custom_marker))
+                        ));
             }
 
             /*
