@@ -1,8 +1,11 @@
 package com.lee.etirps.fragments;
 
 import android.Manifest;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
@@ -11,10 +14,12 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.DialogFragment;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.animation.TranslateAnimation;
 import android.widget.Toast;
@@ -160,14 +165,18 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
 
     @Override
     public void onMyLocationClick(@NonNull Location location) {
-        Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
 
-        VisibleRegion viewPort = mMap.getProjection().getVisibleRegion();
-        mMap.addMarker(new MarkerOptions().position(viewPort.farLeft));
-        mMap.addMarker(new MarkerOptions().position(viewPort.farRight));
+        DialogFragment post_diag = new PostMessageDialogFragment();
+        post_diag.show(getSupportFragmentManager(), "post");
 
-        Log.v("width", "test " + (viewPort.farLeft.longitude - viewPort.nearRight.longitude));
-        Log.v("height", "test " + (viewPort.farLeft.latitude - viewPort.nearRight.latitude));
+        //Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
+
+        //VisibleRegion viewPort = mMap.getProjection().getVisibleRegion();
+        //mMap.addMarker(new MarkerOptions().position(viewPort.farLeft));
+        //mMap.addMarker(new MarkerOptions().position(viewPort.farRight));
+
+        //Log.v("width", "test " + (viewPort.farLeft.longitude - viewPort.nearRight.longitude));
+        //Log.v("height", "test " + (viewPort.farLeft.latitude - viewPort.nearRight.latitude));
 
         //mMap.addMarker(new MarkerOptions().position(new LatLng(location.getLatitude(), location.getLongitude())));
     }
@@ -261,6 +270,29 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
             mMap.setMyLocationEnabled(true);
             /*locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, MIN_TIME, MIN_DISTANCE, this);*/
+        }
+    }
+
+    public static class PostMessageDialogFragment extends DialogFragment{
+        @Override
+        public Dialog onCreateDialog(Bundle savedInstanceState) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+
+            LayoutInflater inflater = getActivity().getLayoutInflater();
+
+            builder.setView(inflater.inflate(R.layout.dialog_create, null)).setPositiveButton("Post", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+                    PostMessageDialogFragment.this.getDialog().cancel();
+                }
+            })      .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            PostMessageDialogFragment.this.getDialog().cancel();
+                        }
+                    }).setTitle("Drop a Fragment");
+
+            return builder.create();
         }
     }
 
