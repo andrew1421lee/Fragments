@@ -1,6 +1,11 @@
 package com.lee.etirps.fragments;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
@@ -35,8 +40,14 @@ import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.VisibleRegion;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.jayway.jsonpath.DocumentContext;
+import com.jayway.jsonpath.JsonPath;
+import net.minidev.json.JSONArray;
+
+import java.util.List;
 
 public class MapsActivity extends FragmentActivity implements OnMyLocationButtonClickListener, OnMyLocationClickListener, LocationListener, OnMapReadyCallback, OnCameraIdleListener, OnCameraMoveStartedListener {
+    public static final String PREFS_NAME = "com.lee.etirps.fragments.PREFS";
 
     private GoogleMap mMap;
     private FusedLocationProviderClient myLocation;
@@ -44,8 +55,14 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
     private UiSettings mUiSettings;
     private double viewWidth = 0.002452544867992401;
     private double viewHeight = 0.002948395655657521;
+
+    private LatLng topRight;
+    private LatLng bottomLeft;
+
     private Location currentLocation;
     private View taskBar;
+
+    private getDataReceiver receiver;
     //private LatLngBounds CenterBound;
     //private LocationManager locationManager;
     //private static final long MIN_TIME = 200;
@@ -56,6 +73,15 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
+
+        SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
+
+        IntentFilter filter = new IntentFilter(getDataReceiver.MESSAGE);
+
+        receiver = new getDataReceiver();
+
+        registerReceiver(receiver, filter);
+
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
@@ -68,14 +94,15 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
                 currentLocation = result.getLastLocation();
                 moveCameraToLocation(currentLocation);
 
-                LatLng latLng = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
-                LatLng one = new LatLng(latLng.latitude - (viewHeight/2), latLng.longitude - (viewWidth /2));
-                LatLng two = new LatLng(latLng.latitude + (viewHeight/2),latLng.longitude + (viewWidth/2));
-                LatLngBounds box = new LatLngBounds(one, two);
-                mMap.setLatLngBoundsForCameraTarget(box);
             }
         };
         taskBar = findViewById(R.id.taskbar);
+    }
+
+    @Override
+    public void onDestroy(){
+        this.unregisterReceiver(receiver);
+        super.onDestroy();
     }
 
     /**
@@ -121,13 +148,6 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
                 public void onSuccess(Location location) {
                     moveCameraToLocation(location);
 
-                    LatLng latLng = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
-
-                    LatLng one = new LatLng(latLng.latitude - (viewHeight/2), latLng.longitude - (viewWidth /2));
-                    LatLng two = new LatLng(latLng.latitude + (viewHeight/2),latLng.longitude + (viewWidth/2));
-
-                    LatLngBounds box = new LatLngBounds(one, two);
-                    mMap.setLatLngBoundsForCameraTarget(box);
                 }
             });
             myLocation.requestLocationUpdates(new LocationRequest().setInterval(200).setSmallestDisplacement(5),mLocationCallback,null);
@@ -203,6 +223,13 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
 
     public void scanButtonPress(View view){
         moveCameraToLocation(currentLocation);
+
+        Intent getPoints = new Intent(MapsActivity.this, getData.class);
+
+        getPoints.putExtra(getData.TOP_RIGHT, topRight.latitude + ":" + topRight.longitude);
+        getPoints.putExtra(getData.BOTTOM_LET, bottomLeft.latitude + ":" + bottomLeft.longitude);
+
+        startService(getPoints);
     }
 
     public void moveCameraToLocation(Location location){
@@ -211,6 +238,17 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
         //Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
         CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 18);
         mMap.animateCamera(cameraUpdate);
+
+        LatLng one = new LatLng(latLng.latitude - (viewHeight/2), latLng.longitude - (viewWidth /2));
+        LatLng two = new LatLng(latLng.latitude + (viewHeight/2),latLng.longitude + (viewWidth/2));
+
+        LatLngBounds box = new LatLngBounds(one, two);
+
+        bottomLeft = one;
+        topRight = two;
+
+        mMap.setLatLngBoundsForCameraTarget(box);
+
     }
 
     private void enableMyLocation() {
@@ -223,6 +261,38 @@ public class MapsActivity extends FragmentActivity implements OnMyLocationButton
             mMap.setMyLocationEnabled(true);
             /*locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, MIN_TIME, MIN_DISTANCE, this);*/
+        }
+    }
+
+    public class getDataReceiver extends BroadcastReceiver{
+        public static final String MESSAGE = "BRO THE DATA IS DOWNLOADED!!!!!";
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String responseMessage = getSharedPreferences(PREFS_NAME,0).getString(getData.RESPONSE_MESSAGE, "No Message");
+
+            JSONArray var = JsonPath.read(responseMessage, "$");
+
+            for(Object obj : var){
+
+                float lat = Float.valueOf(String.valueOf(((JSONArray) obj).get(1)));
+                float lng = Float.valueOf(String.valueOf(((JSONArray) obj).get(2)));
+
+                String author = String.valueOf(((JSONArray) obj).get(3));
+                String msg = String.valueOf(((JSONArray) obj).get(4));
+
+                LatLng coord = new LatLng(lat, lng);
+                mMap.addMarker(new MarkerOptions().position(coord).title(author).snippet(msg));
+            }
+
+            try{
+                Log.e("MapActivity" , String.valueOf(((JSONArray) var.get(0)).get(0)));
+            }catch (Exception ex)
+            {
+                //
+            }
+
+            Toast.makeText(MapsActivity.this, responseMessage, Toast.LENGTH_SHORT).show();
+
         }
     }
 
